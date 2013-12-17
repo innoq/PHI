@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<!--
+Copyright 2011-2013 innoQ Deutschland GmbH
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<html xmlns="http://www.w3.org/1999/xhtml">
+	<head>
+		<meta http-equiv="content-type" content="text/html; charset=utf-8" /> 
+		<meta charset="utf-8" /> 		
+		<title>PHI</title>
+		<link rel="stylesheet" href="css/bootstrap.min.css" />
+		<style type="text/css">
+			body {
+				font-family: sans-serif;
+			}
+			
+			.color-field {
+				width: 25px;
+				height: 25px;
+				padding: 2px;
+			}
+			
+			#legend {
+				list-style-type: none;
+			}
+
+			#projectMenu {
+				overflow: auto;
+				height: 600px;
+			}     
+			
+			#color0 {
+				background-color: #1F77B4;
+			}
+			
+			#color1 {
+				background-color: #FF7F0E;
+			}
+		</style>	
+	</head>
+	<body>
+		<div class="container">
+			<div class="jumbotron">
+				<h1>PHI <small>Project Happiness Index</small></h1>
+			</div>
+			<div class="row row-offcanvas row-offcanvas-left">
+				<div id="sidebar" class="col-xs-6 col-sm-3 sidebar-offcanvas" role="navigation">
+					<div id="projectMenu" class="list-group"></div>
+				</div>				
+				<div class="col-xs-12 col-sm-7">
+					<div id="chart"></div>
+					<div id="debug"></div>
+				</div>
+				<div class="col-xs-12 col-sm-2">
+					<ul id="legend"></ul>
+				</div>
+			</div>
+		</div>
+		<script src="js/d3.v3.min.js" charset="utf-8"></script>
+		<script src="js/radar-chart-min.js"></script>
+		<script type="text/javascript">
+	        var keys = [];	        
+	        var projects = {};
+	        var projectNames = [];
+	        var projectsData = {};
+	        var oldEntryId;
+			var mycfg = {
+				"maxValue":1
+			};
+
+	        d3.csv("PHI.2013-11.csv", function(data) {
+        		for(var i in data) {
+        			var entry = data[i];
+        			if(i == 0) {
+        				setKeys(entry);
+        			}
+    				count('Alle');
+    				projectCount(entry, 'Alle');        			
+	    			count(entry['Projekt']);
+    				projectCount(entry, entry['Projekt']);
+        		}
+        		setProjectMenu();
+        		detectUrl();
+        	});
+
+	        function setKeys(entry){
+	        	var i=0;
+	        	for(var k in entry){
+		        	if(i > 0) {
+			        	keys.push(k);	        				        		
+		        	}
+		        	i++;
+	        	}
+	        }
+
+	        function render(e){
+        		var id = parseInt(e.target.id.replace('nav-entry-',''));
+				updateGraph(id);
+				selectEntry(e.target.id);
+	        }
+
+	        function detectUrl(){
+	        	var parts = window.location.href.split("#");
+	        	if(parts.length > 1){
+	        		updateGraph(parseInt(parts[1]));
+	        		selectEntry('nav-entry-'+parts[1]);
+	        	}
+	        }
+
+	        function selectEntry(id){
+        		if(oldEntryId) {
+        			document.getElementById(oldEntryId).setAttribute("class", "list-group-item");
+        		}
+        		oldEntryId = id;
+        		document.getElementById(id).setAttribute("class", "list-group-item active");
+	        }
+
+	        function updateLegend(name){
+	        	var ul = document.getElementById('legend');
+	        	ul.innerHTML = "";
+	        	var names = ['Alle'];
+	        	names.push(name);
+	        	for(var i in names){
+	        		var li = document.createElement('li');
+	        		var div = document.createElement('div');
+	        		div.setAttribute("class", "color-field");
+	        		div.setAttribute("id", "color"+i);
+	        		li.appendChild(div);
+	        		li.appendChild(document.createTextNode(names[i]));
+	        		ul.appendChild(li);
+	        	}
+	        }
+
+	        function updateGraph(projectId){
+	        	var d = [];
+	        	var pName = projectNames[projectId];
+	        	var pData = projectsData[pName];
+	        	var all = projectsData['Alle'];
+	        	d.push(createAxises(all, all['count']));
+	        	d.push(createAxises(pData, pData['count']));
+	        	RadarChart.draw("#chart", d, mycfg);
+	        	updateLegend(pName);
+	        }
+
+	        function createAxises(data, count){
+	        	var axises = [];
+	        	var values = data["values"];
+	        	for(var k in keys){
+	        		var key = keys[k];
+	        		axises.push({
+	        			"axis":key,
+	        			"value":values[key]/count
+	        		});
+	        	}
+	        	return axises;
+	        }
+
+	        function projectCount(entry, name){
+	        	var value = 0;
+	        	var count = projectsData[name]['count'];
+	        	for(var k in keys){
+	        		var key = keys[k];
+	        		if(entry[key]){
+	        			projectsData[name]['values'][key] += parseInt(entry[key]);
+	        		}
+	        	}
+	        	projectsData[name]['count'] = count + 1;
+	        }
+
+        	function count(name){
+        		if(!projects[name]){
+        			projects[name] = 1;
+        			projectsData[name] = {
+        				"count":0,
+        				"values":{}
+        			};
+        			for(var k in keys){
+        				projectsData[name]['values'][keys[k]] = 0;
+        			}
+        		} else {
+        			projects[name] += 1;	
+        		}
+        	}
+
+        	function setProjectMenu(){
+        		var projectMenu = document.getElementById('projectMenu');
+        		projectMenu.innerHTML = "";
+        		var id = 0;
+        		for(var name in projects){
+        			var a = document.createElement('a');
+        			a.setAttribute('id', 'nav-entry-'+id);
+        			a.setAttribute('class', 'list-group-item');
+        			a.setAttribute('href', '#'+id);
+        			a.innerHTML="("+projects[name]+") "+name;
+					projectNames.push(name);
+					addEvent(a, 'click', render);
+        			projectMenu.appendChild(a);
+        			id++;
+        		}
+        	}
+        	function addEvent(element, evnt, funct){
+			  if (element.attachEvent)
+			   return element.attachEvent('on'+evnt, funct);
+			  else
+			   return element.addEventListener(evnt, funct, false);
+			}
+	    </script>
+	</body>
+</html>
